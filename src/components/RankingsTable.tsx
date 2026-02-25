@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { TeamRanking, RankingSource, SOURCES } from '@/types';
+import { getTeamColor } from '@/data/teamColors';
 
 type SortKey = 'composite' | 'team' | RankingSource;
 type SortDir = 'asc' | 'desc';
@@ -12,24 +13,23 @@ interface RankingsTableProps {
   loading: boolean;
 }
 
-function getRankColor(rank: number | undefined, fullRanking: boolean): string {
-  if (rank === undefined) return 'text-gray-300';
-  if (rank <= 5) return 'text-amber-600 font-bold';
-  if (rank <= 25) return 'text-blue-700 font-semibold';
-  if (!fullRanking) return 'text-gray-400'; // shouldn't show for top-25-only polls
-  return 'text-gray-700';
+function rankBadgeStyle(rank: number | undefined): React.CSSProperties {
+  if (rank === undefined) return { color: '#334155' };
+  if (rank <= 5) return { color: '#fbbf24', fontWeight: 800 };
+  if (rank <= 25) return { color: '#60a5fa', fontWeight: 700 };
+  return { color: '#94a3b8', fontWeight: 500 };
 }
 
-function getRankBg(compositeRank: number): string {
-  if (compositeRank <= 5) return 'bg-amber-50';
-  if (compositeRank <= 10) return 'bg-yellow-50';
-  if (compositeRank <= 25) return 'bg-blue-50';
-  return '';
+function compositeBg(displayRank: number): React.CSSProperties {
+  if (displayRank === 1) return { background: '#fbbf2412' };
+  if (displayRank <= 5) return { background: '#fbbf2408' };
+  if (displayRank <= 25) return { background: '#3b82f608' };
+  return {};
 }
 
-function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
-  if (!active) return <span className="text-gray-300">↕</span>;
-  return <span className="text-blue-600">{dir === 'asc' ? '↑' : '↓'}</span>;
+function SortArrow({ active, dir }: { active: boolean; dir: SortDir }) {
+  if (!active) return <span style={{ color: '#334155', fontSize: 10 }}>↕</span>;
+  return <span style={{ color: '#f97316', fontSize: 10 }}>{dir === 'asc' ? '↑' : '↓'}</span>;
 }
 
 export function RankingsTable({ teams, selectedSources, loading }: RankingsTableProps) {
@@ -40,65 +40,72 @@ export function RankingsTable({ teams, selectedSources, loading }: RankingsTable
   const pageSize = 50;
 
   function handleSort(key: SortKey) {
-    if (sortKey === key) {
-      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSortKey(key);
-      setSortDir('asc');
-    }
+    if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else { setSortKey(key); setSortDir('asc'); }
     setPage(1);
   }
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
     return q
-      ? teams.filter((t) => t.team.toLowerCase().includes(q) || t.conference?.toLowerCase().includes(q))
+      ? teams.filter(
+          (t) =>
+            t.team.toLowerCase().includes(q) ||
+            t.conference?.toLowerCase().includes(q)
+        )
       : teams;
   }, [teams, search]);
 
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => {
-      let aVal: number | string | undefined;
-      let bVal: number | string | undefined;
-
-      if (sortKey === 'team') {
-        aVal = a.team;
-        bVal = b.team;
-      } else if (sortKey === 'composite') {
-        aVal = a.composite ?? 9999;
-        bVal = b.composite ?? 9999;
-      } else {
-        aVal = a[sortKey] ?? 9999;
-        bVal = b[sortKey] ?? 9999;
+      let aVal: number | string;
+      let bVal: number | string;
+      if (sortKey === 'team') { aVal = a.team; bVal = b.team; }
+      else if (sortKey === 'composite') { aVal = a.composite ?? 9999; bVal = b.composite ?? 9999; }
+      else { aVal = a[sortKey] ?? 9999; bVal = b[sortKey] ?? 9999; }
+      if (typeof aVal === 'string') {
+        return sortDir === 'asc' ? aVal.localeCompare(bVal as string) : (bVal as string).localeCompare(aVal);
       }
-
-      if (typeof aVal === 'string' && typeof bVal === 'string') {
-        return sortDir === 'asc'
-          ? aVal.localeCompare(bVal)
-          : bVal.localeCompare(aVal);
-      }
-
-      const diff = (aVal as number) - (bVal as number);
-      return sortDir === 'asc' ? diff : -diff;
+      return sortDir === 'asc' ? (aVal as number) - (bVal as number) : (bVal as number) - (aVal as number);
     });
   }, [filtered, sortKey, sortDir]);
 
   const totalPages = Math.ceil(sorted.length / pageSize);
   const paginated = sorted.slice((page - 1) * pageSize, page * pageSize);
-
   const activeSources = SOURCES.filter((s) => selectedSources.has(s.id));
+
+  const thStyle: React.CSSProperties = {
+    padding: '10px 12px',
+    textAlign: 'left',
+    fontSize: 11,
+    fontWeight: 700,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    color: '#64748b',
+    background: '#0f2645',
+    borderBottom: '1px solid #1e3a5f',
+    whiteSpace: 'nowrap',
+    cursor: 'pointer',
+    userSelect: 'none',
+  };
+
+  const thCenter: React.CSSProperties = { ...thStyle, textAlign: 'center' };
 
   if (loading) {
     return (
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-12 text-center">
-        <div className="inline-flex flex-col items-center gap-3">
-          <svg className="animate-spin w-8 h-8 text-blue-500" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-          </svg>
-          <p className="text-gray-500 font-medium">Scraping rankings from all sources…</p>
-          <p className="text-xs text-gray-400">This may take 15–30 seconds on first load</p>
+      <div
+        className="rounded-xl flex flex-col items-center justify-center py-20 gap-4"
+        style={{ background: '#0f2645', border: '1px solid #1e3a5f' }}
+      >
+        <svg className="animate-spin w-8 h-8" style={{ color: '#f97316' }} fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+        </svg>
+        <div className="text-center">
+          <p className="font-bold text-white">Scraping rankings…</p>
+          <p className="text-xs mt-1" style={{ color: '#64748b' }}>
+            Fetching from all 5 sources in parallel — 15–30 seconds
+          </p>
         </div>
       </div>
     );
@@ -106,159 +113,263 @@ export function RankingsTable({ teams, selectedSources, loading }: RankingsTable
 
   if (teams.length === 0) {
     return (
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-12 text-center">
-        <p className="text-gray-500">No rankings loaded yet. Click <strong>Refresh Rankings</strong> to fetch data.</p>
+      <div
+        className="rounded-xl flex flex-col items-center justify-center py-20 gap-3"
+        style={{ background: '#0f2645', border: '1px solid #1e3a5f' }}
+      >
+        <svg className="w-10 h-10" style={{ color: '#f97316' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+        </svg>
+        <p className="font-semibold text-white">No rankings loaded yet</p>
+        <p className="text-sm" style={{ color: '#64748b' }}>
+          Click <strong className="text-orange-400">Refresh</strong> in the header to fetch data
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+    <div className="rounded-xl overflow-hidden" style={{ border: '1px solid #1e3a5f' }}>
       {/* Search bar */}
-      <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-3">
-        <div className="relative flex-1 max-w-xs">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+      <div
+        className="flex items-center gap-3 px-4 py-3"
+        style={{ background: '#0f2645', borderBottom: '1px solid #1e3a5f' }}
+      >
+        <div className="relative flex-1 max-w-sm">
+          <svg
+            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
+            style={{ color: '#64748b' }}
+            fill="none" viewBox="0 0 24 24" stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
           <input
             type="text"
-            placeholder="Search teams…"
+            placeholder="Search teams or conference…"
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full pl-9 pr-3 py-1.5 text-sm rounded-lg"
+            style={{
+              background: '#0a1931',
+              border: '1px solid #1e3a5f',
+              color: '#e2e8f0',
+              outline: 'none',
+            }}
           />
         </div>
-        <span className="text-xs text-gray-400 whitespace-nowrap">
-          {filtered.length} team{filtered.length !== 1 ? 's' : ''}
+        <span className="text-xs ml-auto" style={{ color: '#475569' }}>
+          {filtered.length} teams
         </span>
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto scrollbar-thin">
-        <table className="w-full text-sm">
+      <div className="overflow-x-auto" style={{ background: '#0a1931' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
-            <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="px-3 py-2.5 text-left w-10">
-                <button className="table-header-btn" onClick={() => handleSort('composite')}>
-                  # <SortIcon active={sortKey === 'composite'} dir={sortDir} />
-                </button>
+            <tr>
+              <th style={{ ...thCenter, width: 42 }} onClick={() => handleSort('composite')}>
+                <div className="flex items-center justify-center gap-1">
+                  # <SortArrow active={sortKey === 'composite'} dir={sortDir} />
+                </div>
               </th>
-              <th className="px-3 py-2.5 text-left min-w-[180px]">
-                <button className="table-header-btn" onClick={() => handleSort('team')}>
-                  Team <SortIcon active={sortKey === 'team'} dir={sortDir} />
-                </button>
+              <th style={{ ...thStyle, minWidth: 180 }} onClick={() => handleSort('team')}>
+                <div className="flex items-center gap-1">
+                  Team <SortArrow active={sortKey === 'team'} dir={sortDir} />
+                </div>
               </th>
-              <th className="px-3 py-2.5 text-center">
-                <button className="table-header-btn justify-center" onClick={() => handleSort('composite')}>
-                  Composite <SortIcon active={sortKey === 'composite'} dir={sortDir} />
-                </button>
+              <th
+                style={{ ...thCenter, minWidth: 80, color: '#f97316' }}
+                onClick={() => handleSort('composite')}
+              >
+                <div className="flex items-center justify-center gap-1">
+                  Composite <SortArrow active={sortKey === 'composite'} dir={sortDir} />
+                </div>
               </th>
               {SOURCES.map((source) => (
                 <th
                   key={source.id}
-                  className={`px-3 py-2.5 text-center transition-opacity ${
-                    selectedSources.has(source.id) ? 'opacity-100' : 'opacity-40'
-                  }`}
+                  style={{
+                    ...thCenter,
+                    color: selectedSources.has(source.id) ? source.color : '#334155',
+                    opacity: selectedSources.has(source.id) ? 1 : 0.5,
+                  }}
+                  onClick={() => handleSort(source.id)}
                 >
-                  <button
-                    className="table-header-btn justify-center"
-                    onClick={() => handleSort(source.id)}
-                    style={{ color: selectedSources.has(source.id) ? source.color : undefined }}
-                  >
-                    {source.label} <SortIcon active={sortKey === source.id} dir={sortDir} />
-                  </button>
+                  <div className="flex flex-col items-center gap-0.5">
+                    <div className="flex items-center gap-1">
+                      {source.label}
+                      <SortArrow active={sortKey === source.id} dir={sortDir} />
+                    </div>
+                    {!source.fullRanking && (
+                      <span style={{ fontSize: 9, opacity: 0.6, fontWeight: 400, letterSpacing: 0 }}>
+                        TOP 25
+                      </span>
+                    )}
+                  </div>
                 </th>
               ))}
-              <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-400 whitespace-nowrap">
-                Conf.
-              </th>
-              <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">
-                Record
-              </th>
-              <th className="px-3 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-gray-400 whitespace-nowrap">
-                Sources
-              </th>
+              <th style={{ ...thStyle, color: '#334155' }}>Conf</th>
+              <th style={{ ...thCenter, color: '#334155' }}>W-L</th>
+              <th style={{ ...thCenter, color: '#334155', fontSize: 10 }}>Srcs</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
-            {paginated.map((team, idx) => {
-              const compositeRank = (page - 1) * pageSize + idx + 1;
+          <tbody>
+            {paginated.map((team) => {
               const displayRank = sorted.indexOf(team) + 1;
-              const rowBg = getRankBg(displayRank);
+              const teamColor = getTeamColor(team.team);
+              const rowBg = compositeBg(displayRank);
 
               return (
                 <tr
                   key={team.team}
-                  className={`hover:bg-blue-50/50 transition-colors ${rowBg}`}
+                  style={{
+                    ...rowBg,
+                    borderBottom: '1px solid #0f2645',
+                    transition: 'background 0.1s',
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLTableRowElement).style.background = '#0f2645';
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLTableRowElement).style.background =
+                      rowBg.background as string ?? '';
+                  }}
                 >
-                  {/* Composite rank # */}
-                  <td className="px-3 py-2 text-center">
-                    <span className={`text-sm font-bold ${
-                      displayRank <= 5 ? 'text-amber-600' :
-                      displayRank <= 25 ? 'text-blue-700' : 'text-gray-500'
-                    }`}>
+                  {/* Rank # */}
+                  <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                    <span
+                      style={{
+                        fontSize: team.composite !== undefined && displayRank <= 9 ? 15 : 13,
+                        fontWeight: displayRank <= 5 ? 800 : displayRank <= 25 ? 700 : 500,
+                        color:
+                          displayRank <= 5
+                            ? '#fbbf24'
+                            : displayRank <= 25
+                            ? '#60a5fa'
+                            : '#475569',
+                        fontVariantNumeric: 'tabular-nums',
+                      }}
+                    >
                       {team.composite !== undefined ? displayRank : '—'}
                     </span>
                   </td>
 
-                  {/* Team name */}
-                  <td className="px-3 py-2">
-                    <span className="font-medium text-gray-900">{team.team}</span>
+                  {/* Team name with color accent */}
+                  <td style={{ padding: '8px 12px' }}>
+                    <div className="flex items-center gap-2">
+                      <div
+                        style={{
+                          width: 4,
+                          height: 28,
+                          borderRadius: 2,
+                          background: teamColor,
+                          flexShrink: 0,
+                        }}
+                      />
+                      <span
+                        style={{
+                          fontWeight: displayRank <= 25 ? 700 : 500,
+                          color: displayRank <= 5 ? '#f1f5f9' : '#cbd5e1',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {team.team}
+                      </span>
+                    </div>
                   </td>
 
                   {/* Composite score */}
-                  <td className="px-3 py-2 text-center">
+                  <td style={{ padding: '8px 12px', textAlign: 'center' }}>
                     {team.composite !== undefined ? (
-                      <span className={`font-bold tabular-nums ${
-                        displayRank <= 5 ? 'text-amber-600 text-base' :
-                        displayRank <= 25 ? 'text-blue-700' : 'text-gray-700'
-                      }`}>
+                      <span
+                        style={{
+                          fontVariantNumeric: 'tabular-nums',
+                          fontWeight: displayRank <= 5 ? 800 : 700,
+                          fontSize: displayRank <= 5 ? 15 : 13,
+                          color:
+                            displayRank <= 5
+                              ? '#fbbf24'
+                              : displayRank <= 25
+                              ? '#60a5fa'
+                              : '#94a3b8',
+                        }}
+                      >
                         {team.composite.toFixed(1)}
                       </span>
                     ) : (
-                      <span className="text-gray-300 text-xs">—</span>
+                      <span style={{ color: '#1e3a5f' }}>—</span>
                     )}
                   </td>
 
                   {/* Individual source ranks */}
                   {SOURCES.map((source) => {
                     const rank = team[source.id];
-                    const isSelected = selectedSources.has(source.id);
+                    const isActive = selectedSources.has(source.id);
                     return (
                       <td
                         key={source.id}
-                        className={`px-3 py-2 text-center tabular-nums transition-opacity ${
-                          isSelected ? 'opacity-100' : 'opacity-30'
-                        }`}
+                        style={{
+                          padding: '8px 12px',
+                          textAlign: 'center',
+                          opacity: isActive ? 1 : 0.3,
+                          fontVariantNumeric: 'tabular-nums',
+                        }}
                       >
                         {rank !== undefined ? (
-                          <span className={getRankColor(rank, source.fullRanking)}>
-                            {rank}
-                          </span>
+                          <span style={rankBadgeStyle(rank)}>{rank}</span>
                         ) : (
-                          <span className="text-gray-200 text-xs">—</span>
+                          <span style={{ color: '#1e3a5f', fontSize: 11 }}>—</span>
                         )}
                       </td>
                     );
                   })}
 
                   {/* Conference */}
-                  <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">
+                  <td
+                    style={{
+                      padding: '8px 12px',
+                      fontSize: 11,
+                      color: '#475569',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
                     {team.conference || '—'}
                   </td>
 
                   {/* Record */}
-                  <td className="px-3 py-2 text-xs text-gray-500 tabular-nums whitespace-nowrap">
+                  <td
+                    style={{
+                      padding: '8px 12px',
+                      textAlign: 'center',
+                      fontSize: 11,
+                      color: '#475569',
+                      fontVariantNumeric: 'tabular-nums',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
                     {team.record || '—'}
                   </td>
 
-                  {/* Sources ranked count */}
-                  <td className="px-3 py-2 text-center">
-                    <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${
-                      (team.sourcesRanked ?? 0) >= activeSources.length
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-gray-100 text-gray-500'
-                    }`}>
+                  {/* Sources count */}
+                  <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        padding: '2px 6px',
+                        borderRadius: 999,
+                        background:
+                          (team.sourcesRanked ?? 0) >= activeSources.length
+                            ? '#16a34a22'
+                            : '#334155',
+                        color:
+                          (team.sourcesRanked ?? 0) >= activeSources.length
+                            ? '#4ade80'
+                            : '#64748b',
+                      }}
+                    >
                       {team.sourcesRanked ?? 0}/{activeSources.length}
                     </span>
                   </td>
@@ -271,47 +382,73 @@ export function RankingsTable({ teams, selectedSources, loading }: RankingsTable
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between">
-          <span className="text-xs text-gray-500">
-            {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, sorted.length)} of {sorted.length} teams
+        <div
+          className="flex items-center justify-between px-4 py-3"
+          style={{ background: '#0f2645', borderTop: '1px solid #1e3a5f' }}
+        >
+          <span className="text-xs" style={{ color: '#475569' }}>
+            {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, sorted.length)} of{' '}
+            {sorted.length}
           </span>
           <div className="flex gap-1">
-            <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1}
-              className="px-2 py-1 text-xs rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50"
-            >
-              ← Prev
-            </button>
+            <PagBtn onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>
+              ←
+            </PagBtn>
             {Array.from({ length: totalPages }, (_, i) => i + 1)
-              .filter((p) => p === 1 || p === totalPages || Math.abs(p - page) <= 2)
+              .filter((p) => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
               .map((p, idx, arr) => (
-                <span key={p}>
+                <span key={p} className="flex items-center">
                   {idx > 0 && arr[idx - 1] !== p - 1 && (
-                    <span className="px-1 text-gray-300 text-xs">…</span>
+                    <span style={{ color: '#334155', padding: '0 4px', fontSize: 11 }}>…</span>
                   )}
-                  <button
-                    onClick={() => setPage(p)}
-                    className={`w-7 h-7 text-xs rounded border transition-colors ${
-                      page === p
-                        ? 'bg-blue-600 text-white border-blue-600'
-                        : 'border-gray-200 hover:bg-gray-50'
-                    }`}
-                  >
+                  <PagBtn onClick={() => setPage(p)} active={page === p}>
                     {p}
-                  </button>
+                  </PagBtn>
                 </span>
               ))}
-            <button
+            <PagBtn
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
-              className="px-2 py-1 text-xs rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50"
             >
-              Next →
-            </button>
+              →
+            </PagBtn>
           </div>
         </div>
       )}
     </div>
+  );
+}
+
+function PagBtn({
+  onClick,
+  disabled,
+  active,
+  children,
+}: {
+  onClick: () => void;
+  disabled?: boolean;
+  active?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        minWidth: 28,
+        height: 28,
+        borderRadius: 6,
+        fontSize: 12,
+        fontWeight: active ? 700 : 500,
+        background: active ? '#f97316' : 'transparent',
+        color: active ? '#fff' : disabled ? '#1e3a5f' : '#64748b',
+        border: `1px solid ${active ? '#f97316' : '#1e3a5f'}`,
+        cursor: disabled ? 'default' : 'pointer',
+        transition: 'all 0.1s',
+        padding: '0 6px',
+      }}
+    >
+      {children}
+    </button>
   );
 }
