@@ -1,0 +1,55 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --cbb-blue: #003087;
+    --cbb-gold: #FFB81C;
+  }
+}
+
+@layer components {
+  .rank-badge {
+    @apply inline-flex items-center justify-center w-9 h-9 rounded-full text-sm font-bold;
+  }
+
+  .rank-top5 {
+    @apply bg-amber-400 text-amber-900;
+  }
+
+  .rank-top25 {
+    @apply bg-blue-100 text-blue-800;
+  }
+
+  .rank-other {
+    @apply bg-gray-100 text-gray-600;
+  }
+
+  .source-badge {
+    @apply text-xs font-semibold px-2 py-0.5 rounded-full;
+  }
+
+  .table-header-btn {
+    @apply flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-gray-500 hover:text-gray-800 transition-colors cursor-pointer select-none;
+  }
+}
+
+/* Custom scrollbar */
+.scrollbar-thin::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 3px;
+}
+
+/* Rank cell colors */
+.rank-cell-1  { background-color: #fef08a; }
+.rank-cell-5  { background-color: #fde68a; }
+.rank-cell-10 { background-color: #fed7aa; }
+.rank-cell-25 { background-color: #dbeafe; }
