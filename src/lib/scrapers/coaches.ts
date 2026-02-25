@@ -1,46 +1,48 @@
 /**
  * USA Today Coaches Poll scraper
- * Source: NCAA rankings page (coaches poll) or USA Today
- * Only ranks top 25 teams
+ * Primary: ESPN rankings API (same endpoint as AP, filtered for coaches poll)
+ * Fallback: NCAA HTML page
  */
 import axios from 'axios';
+import { parseEspnRankings } from './ap';
 
 export interface CoachesPollTeam {
   rank: number;
   team: string;
   points?: number;
-  firstPlaceVotes?: number;
 }
 
-const NCAA_COACHES_URL =
-  'https://www.ncaa.com/rankings/basketball-men/d1/usa-today-coaches';
+const HEADERS = {
+  'User-Agent':
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+  Accept: 'application/json, text/html, */*',
+  Origin: 'https://www.espn.com',
+  Referer: 'https://www.espn.com/mens-college-basketball/',
+};
 
-const USAT_URL =
-  'https://sportsdata.usatoday.com/basketball/ncaab/polls/coaches';
+const ESPN_RANKINGS_URL =
+  'https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/rankings';
 
 export async function scrapeCoachesPoll(): Promise<CoachesPollTeam[]> {
-  const headers = {
-    'User-Agent':
-      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-  };
-
-  // Try NCAA Coaches Poll page first
+  // Approach 1: ESPN rankings JSON API
   try {
-    const resp = await axios.get(NCAA_COACHES_URL, { headers, timeout: 15000 });
-    const teams = await parseCoachesHtml(resp.data);
+    const resp = await axios.get(ESPN_RANKINGS_URL, { headers: HEADERS, timeout: 12000 });
+    const teams = parseEspnRankings(resp.data, 'coaches');
     if (teams.length > 0) return teams;
   } catch (err) {
-    console.warn('[Coaches] NCAA URL failed, trying USA Today...', err);
+    console.warn('[Coaches] ESPN API failed:', (err as Error).message);
   }
 
-  // Try USA Today
+  // Approach 2: NCAA HTML page
   try {
-    const resp = await axios.get(USAT_URL, { headers, timeout: 15000 });
-    const teams = await parseCoachesHtml(resp.data);
+    const resp = await axios.get(
+      'https://www.ncaa.com/rankings/basketball-men/d1/usa-today-coaches',
+      { headers: { ...HEADERS, Accept: 'text/html,*/*' }, timeout: 15000 }
+    );
+    const teams = await parseCoachesHtml(resp.data as string);
     if (teams.length > 0) return teams;
   } catch (err) {
-    console.error('[Coaches] USA Today also failed:', err);
+    console.warn('[Coaches] NCAA page failed:', (err as Error).message);
   }
 
   return [];
@@ -54,34 +56,14 @@ async function parseCoachesHtml(html: string): Promise<CoachesPollTeam[]> {
   $('table tbody tr').each((_, row) => {
     const cells = $(row).find('td');
     if (cells.length < 2) return;
-
     const rank = parseInt($(cells[0]).text().trim(), 10);
     const teamCell = $(cells[1]);
-    const teamLink = teamCell.find('a').first().text().trim();
-    const team = teamLink || teamCell.text().trim().split('\n')[0].trim();
-    const points = parseInt($(cells[cells.length - 1]).text().trim().replace(',', ''), 10);
-
+    const team = (teamCell.find('a').first().text().trim() || teamCell.text().trim())
+      .split('\n')[0].trim();
     if (!isNaN(rank) && rank >= 1 && rank <= 25 && team && team.length > 1) {
-      teams.push({
-        rank,
-        team,
-        points: isNaN(points) ? undefined : points,
-      });
+      teams.push({ rank, team });
     }
   });
-
-  // Fallback: div-based layouts
-  if (teams.length === 0) {
-    $('.rankings-table tr, .poll-table tr').each((_, row) => {
-      const cells = $(row).find('td, th');
-      if (cells.length < 2) return;
-      const rank = parseInt($(cells[0]).text(), 10);
-      const team = $(cells[1]).text().trim().split('\n')[0].trim();
-      if (!isNaN(rank) && rank >= 1 && rank <= 25 && team) {
-        teams.push({ rank, team });
-      }
-    });
-  }
 
   return teams.slice(0, 25);
 }

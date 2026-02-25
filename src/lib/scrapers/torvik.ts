@@ -16,32 +16,40 @@ const HEADERS = {
   Referer: 'https://barttorvik.com/',
 };
 
-// Year is current season start year
-const YEAR = new Date().getMonth() >= 10 ? new Date().getFullYear() : new Date().getFullYear() - 1;
-
-const JSON_URL = `https://barttorvik.com/getjson.php?year=${YEAR}&tvalue=100&conlimit=All&state=All&begin=${YEAR}1101&end=${YEAR + 1}0501&top=0&revquad=0&site=All&type=All&quad=5&sortby=2`;
+/**
+ * Season end year: the year the tournament is held.
+ * 2025-26 season → YEAR = 2026
+ * Formula: if month >= 10 (Nov/Dec) we're in next year's season, else current year's.
+ */
+function getSeasonYear(): number {
+  const now = new Date();
+  return now.getMonth() >= 10 ? now.getFullYear() + 1 : now.getFullYear();
+}
 
 export async function scrapeTorvik(): Promise<TorkvikTeam[]> {
-  // Approach 1: JSON endpoint
+  const YEAR = getSeasonYear();         // e.g. 2026 for 2025-26 season
+  const PREV = YEAR - 1;                // e.g. 2025
+
+  // Approach 1: current season JSON
   try {
-    const resp = await axios.get(JSON_URL, { headers: HEADERS, timeout: 15000 });
+    const url = `https://barttorvik.com/getjson.php?year=${YEAR}&tvalue=100&conlimit=All&state=All&begin=${PREV}1101&end=${YEAR}0601&top=0&revquad=0&site=All&type=All&quad=5&sortby=2`;
+    const resp = await axios.get(url, { headers: HEADERS, timeout: 15000 });
     if (Array.isArray(resp.data) && resp.data.length > 50) {
       return parseTorkvikJson(resp.data);
     }
   } catch (err) {
-    console.warn('[Torvik] JSON endpoint failed:', (err as Error).message);
+    console.warn('[Torvik] Current-year JSON failed:', (err as Error).message);
   }
 
-  // Approach 2: Try alternate year
+  // Approach 2: previous season JSON (fallback)
   try {
-    const altYear = YEAR - 1;
-    const altUrl = `https://barttorvik.com/getjson.php?year=${altYear}&tvalue=100&conlimit=All&state=All&begin=${altYear}1101&end=${altYear + 1}0501&top=0&revquad=0&site=All&type=All&quad=5&sortby=2`;
-    const resp = await axios.get(altUrl, { headers: HEADERS, timeout: 15000 });
+    const url = `https://barttorvik.com/getjson.php?year=${PREV}&tvalue=100&conlimit=All&state=All&begin=${PREV - 1}1101&end=${PREV}0601&top=0&revquad=0&site=All&type=All&quad=5&sortby=2`;
+    const resp = await axios.get(url, { headers: HEADERS, timeout: 15000 });
     if (Array.isArray(resp.data) && resp.data.length > 50) {
       return parseTorkvikJson(resp.data);
     }
   } catch (err) {
-    console.warn('[Torvik] Alt-year JSON failed:', (err as Error).message);
+    console.warn('[Torvik] Previous-year JSON failed:', (err as Error).message);
   }
 
   // Approach 3: HTML scrape
@@ -58,18 +66,24 @@ function parseTorkvikJson(data: unknown[]): TorkvikTeam[] {
 
   for (let i = 0; i < data.length; i++) {
     const row = data[i];
+
     if (Array.isArray(row)) {
-      // Torvik JSON format: [adjOE, adjDE, team, conf, record, barthag_rank, ...]
-      // Indices can vary — team name is usually index 0 or 2
+      // Torvik JSON format varies by year. Row is typically an array.
+      // Scan for a string that looks like a team name (not a number, not short)
       let team = '';
       let conf = '';
 
-      // Try to find the team name (a string that's not a number and looks like a team name)
-      for (let j = 0; j < Math.min(row.length, 8); j++) {
+      for (let j = 0; j < Math.min(row.length, 10); j++) {
         const val = String(row[j] ?? '').trim();
-        if (val && isNaN(Number(val)) && val.length > 2 && !val.includes('%') && !val.includes('-')) {
+        if (
+          val &&
+          val.length > 2 &&
+          isNaN(Number(val)) &&
+          !val.includes('%') &&
+          !val.match(/^\d+-\d+$/) // not a record like "24-5"
+        ) {
           if (!team) team = val;
-          else if (!conf && val.length <= 20) conf = val;
+          else if (!conf && val.length <= 15) conf = val;
         }
       }
 
