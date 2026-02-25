@@ -71,60 +71,36 @@ export default function HomePage() {
     : [];
 
   return (
-    <div className="min-h-screen" style={{ background: '#0a1931' }}>
+    <div style={{ minHeight: '100vh', background: '#f1f5f9', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+
       {/* ── Header ── */}
-      <header style={{ background: '#0a1931', borderBottom: '3px solid #f97316' }}>
-        <div className="max-w-screen-2xl mx-auto px-4 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="flex items-center gap-3">
-            {/* Basketball icon */}
-            <div
-              className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-              style={{ background: '#f97316' }}
-            >
-              <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 2c1.65 0 3.19.41 4.54 1.12L4.12 16.54A7.94 7.94 0 014 12c0-4.41 3.59-8 8-8zm0 16c-1.65 0-3.19-.41-4.54-1.12l12.42-12.42A7.94 7.94 0 0120 12c0 4.41-3.59 8-8 8z" />
-              </svg>
-            </div>
-            <div>
-              <h1 className="text-xl font-black text-white tracking-tight leading-none">
-                CBB COMPOSITE
-              </h1>
-              <p className="text-xs mt-0.5" style={{ color: '#f97316' }}>
-                Men's College Basketball — Aggregated Rankings
-              </p>
-            </div>
+      <header style={{ background: '#1e3a5f', borderBottom: '4px solid #f97316' }}>
+        <div style={{ maxWidth: 1400, margin: '0 auto', padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+          <div>
+            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em', lineHeight: 1 }}>
+              CBB Composite Rankings
+            </h1>
+            <p style={{ margin: '4px 0 0', fontSize: 12, color: '#93c5fd', fontWeight: 400 }}>
+              Men&apos;s D-I Basketball · Aggregated from 5 sources
+            </p>
           </div>
 
-          <div className="flex items-center gap-4">
-            {/* Source status pills */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            {/* Source status */}
             {rawData && !loading && (
-              <div className="hidden sm:flex items-center gap-1.5">
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {SOURCES.map((s) => {
                   const status = rawData.sourceStatus[s.id];
                   return (
                     <span
                       key={s.id}
-                      className="text-xs px-2 py-0.5 rounded-full font-semibold"
                       style={{
-                        background:
-                          status === 'success'
-                            ? '#16a34a22'
-                            : status === 'error'
-                            ? '#dc262622'
-                            : '#ffffff22',
-                        color:
-                          status === 'success'
-                            ? '#4ade80'
-                            : status === 'error'
-                            ? '#f87171'
-                            : '#94a3b8',
-                        border: `1px solid ${
-                          status === 'success'
-                            ? '#16a34a44'
-                            : status === 'error'
-                            ? '#dc262644'
-                            : '#ffffff22'
-                        }`,
+                        fontSize: 11,
+                        padding: '2px 8px',
+                        borderRadius: 4,
+                        fontWeight: 600,
+                        background: status === 'success' ? '#dcfce7' : status === 'error' ? '#fee2e2' : '#f1f5f9',
+                        color: status === 'success' ? '#15803d' : status === 'error' ? '#b91c1c' : '#64748b',
                       }}
                     >
                       {status === 'success' ? '✓' : status === 'error' ? '✗' : '…'} {s.label}
@@ -134,46 +110,43 @@ export default function HomePage() {
               </div>
             )}
 
-            {/* Refresh button */}
+            {/* Refresh */}
             <button
               onClick={() => fetchRankings(true)}
               disabled={loading}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all disabled:opacity-50"
               style={{
-                background: loading ? '#334155' : '#f97316',
-                color: loading ? '#94a3b8' : '#ffffff',
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '8px 16px', borderRadius: 6, fontSize: 13,
+                fontWeight: 700, cursor: loading ? 'default' : 'pointer',
+                background: loading ? '#94a3b8' : '#f97316',
+                color: '#ffffff', border: 'none',
+                opacity: loading ? 0.7 : 1,
               }}
             >
               <svg
-                className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
+                style={{ width: 14, height: 14, animation: loading ? 'spin 1s linear infinite' : 'none' }}
+                fill="none" viewBox="0 0 24 24" stroke="currentColor"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2.5}
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
-              {loading ? 'Loading…' : 'Refresh'}
+              {loading ? 'Loading…' : 'Refresh Data'}
             </button>
 
             {rawData && !loading && cacheAgeMs !== undefined && (
-              <span className="text-xs hidden sm:block" style={{ color: '#64748b' }}>
-                {formatAge(cacheAgeMs)}
+              <span style={{ fontSize: 11, color: '#93c5fd' }}>
+                Updated {formatAge(cacheAgeMs)}
               </span>
             )}
           </div>
         </div>
       </header>
 
-      {/* ── Sub-bar: source toggles above table ── */}
-      <div style={{ background: '#0f2645', borderBottom: '1px solid #1e3a5f' }}>
-        <div className="max-w-screen-2xl mx-auto px-4 py-3 flex flex-wrap items-center gap-2">
-          <span className="text-xs font-bold uppercase tracking-widest mr-1" style={{ color: '#64748b' }}>
-            Composite:
+      {/* ── Source toggles ── */}
+      <div style={{ background: '#ffffff', borderBottom: '1px solid #e2e8f0' }}>
+        <div style={{ maxWidth: 1400, margin: '0 auto', padding: '10px 24px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginRight: 4 }}>
+            Include in composite:
           </span>
           {SOURCES.map((source) => {
             const active = selectedSources.has(source.id);
@@ -181,29 +154,36 @@ export default function HomePage() {
               <button
                 key={source.id}
                 onClick={() => toggleSource(source.id)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all"
                 style={{
-                  background: active ? source.color : 'transparent',
-                  color: active ? '#ffffff' : '#64748b',
-                  border: `2px solid ${active ? source.color : '#1e3a5f'}`,
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  padding: '4px 12px', borderRadius: 4,
+                  fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                  background: active ? '#1e3a5f' : '#ffffff',
+                  color: active ? '#ffffff' : '#475569',
+                  border: `1px solid ${active ? '#1e3a5f' : '#cbd5e1'}`,
+                  transition: 'all 0.15s',
                 }}
               >
-                {active && (
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                {active ? (
+                  <svg style={{ width: 10, height: 10 }} viewBox="0 0 12 12" fill="currentColor">
+                    <path d="M10 3L5 8.5 2 5.5" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                ) : (
+                  <svg style={{ width: 10, height: 10 }} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <rect x="1" y="1" width="10" height="10" rx="1.5" />
                   </svg>
                 )}
                 {source.label}
                 {!source.fullRanking && (
-                  <span className="opacity-60 font-normal">25</span>
+                  <span style={{ fontSize: 10, fontWeight: 400, color: active ? '#93c5fd' : '#94a3b8' }}>TOP 25</span>
                 )}
               </button>
             );
           })}
 
-          <div className="ml-auto flex items-center gap-3">
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
             {teams.length > 0 && (
-              <span className="text-xs" style={{ color: '#64748b' }}>
+              <span style={{ fontSize: 12, color: '#64748b' }}>
                 {successCount}/{SOURCES.length} sources · {teams.length} teams
               </span>
             )}
@@ -212,17 +192,17 @@ export default function HomePage() {
       </div>
 
       {/* ── Main content ── */}
-      <main className="max-w-screen-2xl mx-auto px-4 py-4">
+      <main style={{ maxWidth: 1400, margin: '0 auto', padding: '16px 24px' }}>
         {/* Error */}
         {error && (
-          <div className="mb-3 rounded-lg px-4 py-3 text-sm flex items-center gap-2"
-            style={{ background: '#7f1d1d22', border: '1px solid #7f1d1d', color: '#fca5a5' }}>
-            <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+          <div style={{
+            marginBottom: 12, padding: '10px 16px', borderRadius: 6,
+            background: '#fef2f2', border: '1px solid #fecaca',
+            color: '#b91c1c', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8,
+          }}>
             <span>Failed to fetch rankings: {error}</span>
-            <button onClick={() => fetchRankings(true)} className="ml-auto underline text-xs">
+            <button onClick={() => fetchRankings(true)}
+              style={{ marginLeft: 'auto', fontSize: 12, color: '#b91c1c', textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer' }}>
               Retry
             </button>
           </div>
@@ -230,24 +210,25 @@ export default function HomePage() {
 
         {/* Source failure warning */}
         {failedSources.length > 0 && !loading && (
-          <div className="mb-3 rounded-lg px-4 py-2.5 text-sm flex items-center gap-2"
-            style={{ background: '#78350f22', border: '1px solid #78350f44', color: '#fbbf24' }}>
-            <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div style={{
+            marginBottom: 12, padding: '8px 16px', borderRadius: 6,
+            background: '#fffbeb', border: '1px solid #fde68a',
+            color: '#92400e', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            <svg style={{ width: 14, height: 14, flexShrink: 0 }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                 d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
-            <span>
-              Could not load: <strong>{failedSources.join(', ')}</strong> — composite calculated from remaining sources.
-            </span>
+            Could not load: <strong>{failedSources.join(', ')}</strong> — composite uses remaining sources.
           </div>
         )}
 
-        {/* Composite explainer */}
-        <div className="mb-3">
+        {/* Methodology */}
+        <div style={{ marginBottom: 12 }}>
           <CompositeExplainer />
         </div>
 
-        {/* Rankings table */}
+        {/* Table */}
         <RankingsTable
           teams={teams}
           selectedSources={selectedSources}
@@ -255,10 +236,14 @@ export default function HomePage() {
         />
       </main>
 
-      <footer className="mt-8 py-5 text-center text-xs" style={{ color: '#334155', borderTop: '1px solid #1e3a5f' }}>
-        CBB Composite Rankings · Not affiliated with NCAA, ESPN, AP, or any other organization ·
+      <footer style={{ marginTop: 32, padding: '20px 24px', textAlign: 'center', fontSize: 11, color: '#94a3b8', borderTop: '1px solid #e2e8f0', background: '#ffffff' }}>
+        CBB Composite Rankings · Not affiliated with the NCAA, ESPN, AP, or any organization ·
         Sources: NCAA NET · ESPN BPI · Barttorvik T-Rank · AP Top 25 · USA Today Coaches Poll
       </footer>
+
+      <style>{`
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+      `}</style>
     </div>
   );
 }
