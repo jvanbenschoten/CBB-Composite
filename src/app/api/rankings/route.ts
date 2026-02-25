@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { scrapeAllRankings } from '@/lib/scrapers';
 import { getCachedRankings, setCachedRankings, clearCache, getCacheAge } from '@/lib/cache';
 
+// Extend Vercel serverless function timeout to 30s (free plan max)
+export const maxDuration = 30;
+
 // GET /api/rankings — return cached data (or scrape if cache is empty)
 export async function GET() {
   try {
