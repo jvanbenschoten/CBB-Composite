@@ -239,7 +239,7 @@ export function RankingsTable({ teams, selectedSources, loading }: RankingsTable
                     {team.conference || '—'}
                   </td>
 
-                  {/* Composite score */}
+                  {/* Composite rank */}
                   <td style={{ padding: '9px 14px', textAlign: 'center' }}>
                     {team.composite !== undefined ? (
                       <span style={{
@@ -248,7 +248,7 @@ export function RankingsTable({ teams, selectedSources, loading }: RankingsTable
                         fontSize: isTop5 ? 15 : 13,
                         color: isTop5 ? '#f97316' : isTop25 ? '#1d4ed8' : '#475569',
                       }}>
-                        {team.composite.toFixed(1)}
+                        {team.composite}
                       </span>
                     ) : (
                       <span style={{ color: '#cbd5e1' }}>—</span>

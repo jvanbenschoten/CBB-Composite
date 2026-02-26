@@ -1,13 +1,41 @@
-import { TeamRanking, RankingSource } from '@/types';
+import { TeamRanking, RankingSource, SOURCES } from '@/types';
+
+/**
+ * How many teams each source effectively ranks.
+ * Full-ranking sources (NET, BPI, Torvik) rank all ~365 D1 teams.
+ * Poll-only sources (AP, Coaches) rank exactly 25 teams.
+ * We normalize ALL sources to the same 365-team scale so that
+ * AP #1 = percentile score of 365/365 (same elite tier as NET #1)
+ * AP #25 = percentile score of 341/365 (~93rd percentile — still excellent)
+ * This prevents raw-rank averaging from unduly penalizing teams that
+ * appear in polls (small scale) vs algorithmic ratings (full scale).
+ */
+const TOTAL_TEAMS = 365;
+
+const SOURCE_CONFIG: Record<RankingSource, { denominator: number }> = {
+  net: { denominator: TOTAL_TEAMS },
+  bpi: { denominator: TOTAL_TEAMS },
+  torvik: { denominator: TOTAL_TEAMS },
+  ap: { denominator: TOTAL_TEAMS },     // treat #1 in AP as #1 of 365
+  coaches: { denominator: TOTAL_TEAMS },
+};
 
 /**
  * Calculates composite rankings for all teams given selected sources.
  *
- * Rules:
- * - For each team, average the ranks from ONLY the sources that ranked them.
- * - If a team appears in zero selected sources, composite = undefined.
- * - Lower composite = better (like golf scoring).
- * - Tiebreaker: teams ranked by more sources rank higher than teams ranked by fewer.
+ * Method: percentile normalization
+ * - For each selected source that ranked the team:
+ *     score = (denominator - rank + 1) / denominator
+ *     e.g. NET #1 → 365/365 = 1.0 (best possible)
+ *          NET #100 → 266/365 = 0.729
+ *          AP #1 → 365/365 = 1.0 (elite)
+ *          AP #25 → 341/365 = 0.934 (still excellent)
+ * - Composite percentile = average of included scores
+ * - Sort descending by composite percentile
+ * - Assign integer composite rank (1 = best)
+ *
+ * Teams unranked in a poll are excluded from that poll's average
+ * (not penalized) — same behavior as before.
  */
 export function calculateComposite(
   teams: TeamRanking[],
@@ -17,37 +45,38 @@ export function calculateComposite(
     return teams.map((t) => ({ ...t, composite: undefined, sourcesRanked: 0 }));
   }
 
-  const withComposite = teams.map((team) => {
-    const ranks: number[] = [];
+  // Compute percentile scores
+  const withScores = teams.map((team) => {
+    const scores: number[] = [];
 
     for (const source of selectedSources) {
       const rank = team[source];
-      if (rank !== undefined && rank !== null) {
-        ranks.push(rank);
+      if (rank !== undefined && rank !== null && rank > 0) {
+        const { denominator } = SOURCE_CONFIG[source];
+        scores.push((denominator - rank + 1) / denominator);
       }
     }
 
-    const sourcesRanked = ranks.length;
-    const composite =
+    const sourcesRanked = scores.length;
+    const avgScore =
       sourcesRanked > 0
-        ? ranks.reduce((sum, r) => sum + r, 0) / sourcesRanked
-        : undefined;
+        ? scores.reduce((sum, s) => sum + s, 0) / sourcesRanked
+        : -1;
 
-    return { ...team, composite, sourcesRanked };
+    return { team, sourcesRanked, avgScore };
   });
 
-  // Sort: teams with a composite rank first (ascending), then unranked teams
-  withComposite.sort((a, b) => {
-    if (a.composite === undefined && b.composite === undefined) return 0;
-    if (a.composite === undefined) return 1;
-    if (b.composite === undefined) return -1;
-
-    // Primary sort: composite score (lower = better)
-    if (a.composite !== b.composite) return a.composite - b.composite;
-
-    // Tiebreaker: more sources ranked = better
-    return (b.sourcesRanked ?? 0) - (a.sourcesRanked ?? 0);
+  // Sort: highest avgScore first (= best team); unranked (avgScore=-1) go last
+  withScores.sort((a, b) => {
+    if (a.avgScore !== b.avgScore) return b.avgScore - a.avgScore;
+    // Tiebreaker: more sources ranked = higher confidence = better rank
+    return b.sourcesRanked - a.sourcesRanked;
   });
 
-  return withComposite;
+  // Assign integer composite rank positions
+  return withScores.map(({ team, sourcesRanked, avgScore }, idx) => ({
+    ...team,
+    composite: avgScore >= 0 ? idx + 1 : undefined,
+    sourcesRanked,
+  }));
 }

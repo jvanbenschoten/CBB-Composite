@@ -1,10 +1,18 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { RankingsData, TeamRanking, RankingSource, SOURCES } from '@/types';
 import { calculateComposite } from '@/lib/composite';
 import { RankingsTable } from '@/components/RankingsTable';
 import { CompositeExplainer } from '@/components/CompositeExplainer';
+
+const ALL_SOURCE_IDS = SOURCES.map((s) => s.id as RankingSource);
+const ALL_SOURCES = new Set<RankingSource>(ALL_SOURCE_IDS);
+
+function setsEqual(a: Set<RankingSource>, b: Set<RankingSource>) {
+  if (a.size !== b.size) return false;
+  return ALL_SOURCE_IDS.every((id) => a.has(id) === b.has(id));
+}
 
 function formatAge(ms: number): string {
   const minutes = Math.floor(ms / 60000);
@@ -28,6 +36,7 @@ export default function HomePage() {
     try {
       const resp = await fetch('/api/rankings', {
         method: forceRefresh ? 'POST' : 'GET',
+        cache: 'no-store',
       });
       if (!resp.ok) {
         const body = await resp.json().catch(() => ({}));
@@ -47,9 +56,14 @@ export default function HomePage() {
     fetchRankings(false);
   }, [fetchRankings]);
 
-  const teams: TeamRanking[] = rawData
-    ? calculateComposite(rawData.teams, Array.from(selectedSources))
-    : [];
+  // When all sources are selected, use the server-precomputed composite directly.
+  // This guarantees correct integer ranks even if the browser has a stale bundle.
+  // When the user toggles sources, re-compute client-side so it's instant.
+  const teams: TeamRanking[] = useMemo(() => {
+    if (!rawData) return [];
+    if (setsEqual(selectedSources, ALL_SOURCES)) return rawData.teams;
+    return calculateComposite(rawData.teams, Array.from(selectedSources));
+  }, [rawData, selectedSources]);
 
   function toggleSource(source: RankingSource) {
     setSelectedSources((prev) => {

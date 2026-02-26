@@ -30,13 +30,13 @@ export function CompositeExplainer() {
       {open && (
         <div style={{ padding: '12px 16px', borderTop: '1px solid #e2e8f0', fontSize: 13, color: '#475569', lineHeight: 1.6 }}>
           <p style={{ margin: '0 0 8px' }}>
-            The <strong style={{ color: '#f97316' }}>Composite</strong> is the simple average of a
-            team&apos;s rank across all selected sources. <strong>Lower = better.</strong> Teams
-            unranked in a poll (AP/Coaches rank only top 25) are excluded from that poll&apos;s
-            contribution rather than penalized.
+            The <strong style={{ color: '#f97316' }}>Composite</strong> normalizes each source to
+            the same 365-team scale before averaging, so AP #1 and NET #1 carry equal weight.
+            Teams unranked in a poll are excluded from that poll&apos;s contribution rather than
+            penalized. <strong>Lower composite rank = better.</strong>
           </p>
           <div style={{ fontFamily: 'monospace', fontSize: 12, background: '#f1f5f9', borderRadius: 4, padding: '6px 12px', color: '#1d4ed8', margin: '8px 0' }}>
-            Composite = Σ(selected ranks) ÷ # selected polls that ranked the team
+            score = (365 − rank + 1) / 365 per source → average scores → rank by score
           </div>
           <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {SOURCES.map((s) => (
