@@ -6,12 +6,14 @@ import { calculateComposite } from '@/lib/composite';
 import { RankingsTable } from '@/components/RankingsTable';
 import { CompositeExplainer } from '@/components/CompositeExplainer';
 
-const ALL_SOURCE_IDS = SOURCES.map((s) => s.id as RankingSource);
-const ALL_SOURCES = new Set<RankingSource>(ALL_SOURCE_IDS);
+// The 9 algorithmic full-ranking sources — default selection on page load.
+// These match what the server pre-computes so we can use the server result directly.
+const DEFAULT_SOURCE_IDS = SOURCES.filter((s) => s.fullRanking).map((s) => s.id as RankingSource);
+const DEFAULT_SOURCES_SET = new Set<RankingSource>(DEFAULT_SOURCE_IDS);
 
 function setsEqual(a: Set<RankingSource>, b: Set<RankingSource>) {
   if (a.size !== b.size) return false;
-  return ALL_SOURCE_IDS.every((id) => a.has(id) === b.has(id));
+  return Array.from(b).every((id) => a.has(id));
 }
 
 function formatAge(ms: number): string {
@@ -27,7 +29,7 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null);
   const [cacheAgeMs, setCacheAgeMs] = useState<number | undefined>();
   const [selectedSources, setSelectedSources] = useState<Set<RankingSource>>(
-    new Set<RankingSource>(['net', 'bpi', 'torvik', 'ap', 'coaches'])
+    new Set<RankingSource>(DEFAULT_SOURCE_IDS)
   );
 
   const fetchRankings = useCallback(async (forceRefresh = false) => {
@@ -56,12 +58,12 @@ export default function HomePage() {
     fetchRankings(false);
   }, [fetchRankings]);
 
-  // When all sources are selected, use the server-precomputed composite directly.
-  // This guarantees correct integer ranks even if the browser has a stale bundle.
-  // When the user toggles sources, re-compute client-side so it's instant.
+  // When the default 9 algorithmic sources are selected, use the server-precomputed
+  // composite directly (avoids running a potentially stale client bundle on first load).
+  // When the user toggles sources, re-compute client-side instantly.
   const teams: TeamRanking[] = useMemo(() => {
     if (!rawData) return [];
-    if (setsEqual(selectedSources, ALL_SOURCES)) return rawData.teams;
+    if (setsEqual(selectedSources, DEFAULT_SOURCES_SET)) return rawData.teams;
     return calculateComposite(rawData.teams, Array.from(selectedSources));
   }, [rawData, selectedSources]);
 
@@ -89,28 +91,28 @@ export default function HomePage() {
 
       {/* ── Header ── */}
       <header style={{ background: '#1e3a5f', borderBottom: '4px solid #f97316' }}>
-        <div style={{ maxWidth: 1400, margin: '0 auto', padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+        <div style={{ maxWidth: 1600, margin: '0 auto', padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
           <div>
             <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em', lineHeight: 1 }}>
               CBB Composite Rankings
             </h1>
             <p style={{ margin: '4px 0 0', fontSize: 12, color: '#93c5fd', fontWeight: 400 }}>
-              Men&apos;s D-I Basketball · Aggregated from 5 sources
+              Men&apos;s D-I Basketball · Aggregated from {SOURCES.length} sources
             </p>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            {/* Source status */}
+            {/* Source status badges */}
             {rawData && !loading && (
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
                 {SOURCES.map((s) => {
                   const status = rawData.sourceStatus[s.id];
                   return (
                     <span
                       key={s.id}
                       style={{
-                        fontSize: 11,
-                        padding: '2px 8px',
+                        fontSize: 10,
+                        padding: '2px 7px',
                         borderRadius: 4,
                         fontWeight: 600,
                         background: status === 'success' ? '#dcfce7' : status === 'error' ? '#fee2e2' : '#f1f5f9',
@@ -158,8 +160,8 @@ export default function HomePage() {
 
       {/* ── Source toggles ── */}
       <div style={{ background: '#ffffff', borderBottom: '1px solid #e2e8f0' }}>
-        <div style={{ maxWidth: 1400, margin: '0 auto', padding: '10px 24px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginRight: 4 }}>
+        <div style={{ maxWidth: 1600, margin: '0 auto', padding: '10px 24px', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginRight: 4, whiteSpace: 'nowrap' }}>
             Include in composite:
           </span>
           {SOURCES.map((source) => {
@@ -168,9 +170,10 @@ export default function HomePage() {
               <button
                 key={source.id}
                 onClick={() => toggleSource(source.id)}
+                title={`${source.description} · weight ${source.weight}`}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 5,
-                  padding: '4px 12px', borderRadius: 4,
+                  display: 'flex', alignItems: 'center', gap: 4,
+                  padding: '4px 10px', borderRadius: 4,
                   fontSize: 12, fontWeight: 600, cursor: 'pointer',
                   background: active ? '#1e3a5f' : '#ffffff',
                   color: active ? '#ffffff' : '#475569',
@@ -189,7 +192,10 @@ export default function HomePage() {
                 )}
                 {source.label}
                 {!source.fullRanking && (
-                  <span style={{ fontSize: 10, fontWeight: 400, color: active ? '#93c5fd' : '#94a3b8' }}>TOP 25</span>
+                  <span style={{ fontSize: 9, fontWeight: 400, color: active ? '#93c5fd' : '#94a3b8' }}>TOP25</span>
+                )}
+                {source.fullRanking && (
+                  <span style={{ fontSize: 9, fontWeight: 400, color: active ? '#93c5fd' : '#94a3b8' }}>{source.weight}%</span>
                 )}
               </button>
             );
@@ -206,7 +212,7 @@ export default function HomePage() {
       </div>
 
       {/* ── Main content ── */}
-      <main style={{ maxWidth: 1400, margin: '0 auto', padding: '16px 24px' }}>
+      <main style={{ maxWidth: 1600, margin: '0 auto', padding: '16px 24px' }}>
         {/* Error */}
         {error && (
           <div style={{
@@ -252,7 +258,7 @@ export default function HomePage() {
 
       <footer style={{ marginTop: 32, padding: '20px 24px', textAlign: 'center', fontSize: 11, color: '#94a3b8', borderTop: '1px solid #e2e8f0', background: '#ffffff' }}>
         CBB Composite Rankings · Not affiliated with the NCAA, ESPN, AP, or any organization ·
-        Sources: NCAA NET · ESPN BPI · Barttorvik T-Rank · AP Top 25 · USA Today Coaches Poll
+        Sources: NCAA NET · KenPom · Bart Torvik T-Rank · ESPN BPI · SOR · KPI · ELO · Sagarin · WAB · AP Top 25 · USA Today Coaches Poll
       </footer>
 
       <style>{`

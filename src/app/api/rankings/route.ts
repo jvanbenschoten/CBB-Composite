@@ -10,14 +10,15 @@ export const maxDuration = 30;
 // Never let the browser cache the API response — always fetch fresh from the server.
 const NO_CACHE = { 'Cache-Control': 'no-store, no-cache, must-revalidate' };
 
-// All sources in their canonical order
-const ALL_SOURCES = SOURCES.map((s) => s.id) as RankingSource[];
+// Pre-compute composite using the 9 algorithmic (full-ranking) sources,
+// which is the default selection shown on page load.
+const DEFAULT_SOURCES = SOURCES.filter((s) => s.fullRanking).map((s) => s.id) as RankingSource[];
 
 function respond(data: ReturnType<typeof getCachedRankings>, extra: Record<string, unknown>) {
   if (!data) return NextResponse.json({ error: 'No data' }, { status: 500, headers: NO_CACHE });
-  // Pre-compute composite with all sources so the browser never needs to run
-  // an old/stale copy of calculateComposite() for the initial page render.
-  const teamsWithComposite = calculateComposite(data.teams, ALL_SOURCES);
+  // Pre-compute composite server-side so the browser gets integer-exact ranks
+  // on first load without running a potentially stale client bundle.
+  const teamsWithComposite = calculateComposite(data.teams, DEFAULT_SOURCES);
   return NextResponse.json(
     { ...data, teams: teamsWithComposite, ...extra },
     { headers: NO_CACHE }

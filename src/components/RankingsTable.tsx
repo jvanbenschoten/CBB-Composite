@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { TeamRanking, RankingSource, SOURCES } from '@/types';
 import { getTeamColor } from '@/data/teamColors';
 
-type SortKey = 'composite' | 'team' | 'record' | 'conference' | RankingSource;
+type SortKey = 'composite' | 'team' | 'record' | 'conference' | 'adjO' | 'adjD' | RankingSource;
 type SortDir = 'asc' | 'desc';
 
 interface RankingsTableProps {
@@ -23,12 +23,18 @@ function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
 
 export function RankingsTable({ teams, selectedSources, loading }: RankingsTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>('composite');
-  const [sortDir, setSortDir] = useState<SortDir>('asc');
+  // composite is a score (higher = better), so default desc = best teams first
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [search, setSearch] = useState('');
 
   function handleSort(key: SortKey) {
-    if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
-    else { setSortKey(key); setSortDir('asc'); }
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      // Score/efficiency columns where higher = better default to descending
+      setSortDir(key === 'composite' || key === 'adjO' ? 'desc' : 'asc');
+    }
   }
 
   const filtered = useMemo(() => {
@@ -49,8 +55,13 @@ export function RankingsTable({ teams, selectedSources, loading }: RankingsTable
       if (sortKey === 'team') { aVal = a.team; bVal = b.team; }
       else if (sortKey === 'conference') { aVal = a.conference ?? ''; bVal = b.conference ?? ''; }
       else if (sortKey === 'record') { aVal = a.record ?? ''; bVal = b.record ?? ''; }
-      else if (sortKey === 'composite') { aVal = a.composite ?? 9999; bVal = b.composite ?? 9999; }
-      else { aVal = a[sortKey] ?? 9999; bVal = b[sortKey] ?? 9999; }
+      else if (sortKey === 'composite') {
+        // Higher score = better, unranked → -1 so they sort last in desc
+        aVal = a.composite ?? -1; bVal = b.composite ?? -1;
+      }
+      else if (sortKey === 'adjO') { aVal = a.adjO ?? -1; bVal = b.adjO ?? -1; }
+      else if (sortKey === 'adjD') { aVal = a.adjD ?? 9999; bVal = b.adjD ?? 9999; }
+      else { aVal = a[sortKey as RankingSource] ?? 9999; bVal = b[sortKey as RankingSource] ?? 9999; }
 
       if (typeof aVal === 'string') {
         return sortDir === 'asc'
@@ -65,7 +76,7 @@ export function RankingsTable({ teams, selectedSources, loading }: RankingsTable
 
   // Styles
   const th: React.CSSProperties = {
-    padding: '10px 14px',
+    padding: '10px 10px',
     textAlign: 'left',
     fontSize: 11,
     fontWeight: 700,
@@ -91,7 +102,7 @@ export function RankingsTable({ teams, selectedSources, loading }: RankingsTable
           <path style={{ opacity: 0.75 }} fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
         </svg>
         <p style={{ marginTop: 12, fontWeight: 600, color: '#1e293b', fontSize: 15 }}>Scraping rankings…</p>
-        <p style={{ marginTop: 4, color: '#64748b', fontSize: 13 }}>Fetching all 5 sources in parallel — may take up to 30 seconds</p>
+        <p style={{ marginTop: 4, color: '#64748b', fontSize: 13 }}>Fetching 9 algorithmic sources + polls in parallel — may take up to 30 seconds</p>
       </div>
     );
   }
@@ -146,24 +157,25 @@ export function RankingsTable({ teams, selectedSources, loading }: RankingsTable
           <thead>
             <tr>
               {/* Rank # */}
-              <th style={{ ...thC, width: 46 }} onClick={() => handleSort('composite')}>
+              <th style={{ ...thC, width: 42 }} onClick={() => handleSort('composite')}>
                 # <SortIcon active={sortKey === 'composite'} dir={sortDir} />
               </th>
               {/* Team */}
-              <th style={{ ...th, minWidth: 190 }} onClick={() => handleSort('team')}>
+              <th style={{ ...th, minWidth: 180 }} onClick={() => handleSort('team')}>
                 Team <SortIcon active={sortKey === 'team'} dir={sortDir} />
               </th>
               {/* Record */}
-              <th style={{ ...thC, width: 70 }} onClick={() => handleSort('record')}>
+              <th style={{ ...thC, width: 60 }} onClick={() => handleSort('record')}>
                 W-L <SortIcon active={sortKey === 'record'} dir={sortDir} />
               </th>
               {/* Conference */}
-              <th style={{ ...th, minWidth: 90 }} onClick={() => handleSort('conference')}>
+              <th style={{ ...th, minWidth: 80 }} onClick={() => handleSort('conference')}>
                 Conf <SortIcon active={sortKey === 'conference'} dir={sortDir} />
               </th>
-              {/* Composite */}
-              <th style={{ ...thC, minWidth: 100, color: '#f97316' }} onClick={() => handleSort('composite')}>
-                Composite <SortIcon active={sortKey === 'composite'} dir={sortDir} />
+              {/* Composite score */}
+              <th style={{ ...thC, minWidth: 90, color: '#f97316' }} onClick={() => handleSort('composite')}>
+                <div>Score <SortIcon active={sortKey === 'composite'} dir={sortDir} /></div>
+                <div style={{ fontSize: 9, fontWeight: 400, color: '#fdba74', marginTop: 1 }}>0–100</div>
               </th>
               {/* Individual sources */}
               {SOURCES.map((source) => (
@@ -171,19 +183,28 @@ export function RankingsTable({ teams, selectedSources, loading }: RankingsTable
                   key={source.id}
                   style={{
                     ...thC,
-                    minWidth: 80,
+                    minWidth: 68,
                     color: selectedSources.has(source.id) ? '#1e3a5f' : '#cbd5e1',
                   }}
                   onClick={() => handleSort(source.id)}
                 >
                   <div>
                     {source.label} <SortIcon active={sortKey === source.id} dir={sortDir} />
-                    {!source.fullRanking && (
-                      <div style={{ fontSize: 9, fontWeight: 400, color: '#94a3b8', marginTop: 1 }}>TOP 25</div>
-                    )}
                   </div>
+                  {!source.fullRanking && (
+                    <div style={{ fontSize: 9, fontWeight: 400, color: '#94a3b8', marginTop: 1 }}>TOP 25</div>
+                  )}
                 </th>
               ))}
+              {/* Barttorvik efficiency */}
+              <th style={{ ...thC, minWidth: 68, color: '#64748b' }} onClick={() => handleSort('adjO')}>
+                <div>AdjO <SortIcon active={sortKey === 'adjO'} dir={sortDir} /></div>
+                <div style={{ fontSize: 9, fontWeight: 400, color: '#94a3b8', marginTop: 1 }}>off eff</div>
+              </th>
+              <th style={{ ...thC, minWidth: 68, color: '#64748b' }} onClick={() => handleSort('adjD')}>
+                <div>AdjD <SortIcon active={sortKey === 'adjD'} dir={sortDir} /></div>
+                <div style={{ fontSize: 9, fontWeight: 400, color: '#94a3b8', marginTop: 1 }}>def eff</div>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -201,7 +222,7 @@ export function RankingsTable({ teams, selectedSources, loading }: RankingsTable
                   onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ''; }}
                 >
                   {/* Rank number */}
-                  <td style={{ padding: '9px 14px', textAlign: 'center' }}>
+                  <td style={{ padding: '8px 10px', textAlign: 'center' }}>
                     <span style={{
                       fontSize: isTop25 ? 14 : 13,
                       fontWeight: isTop5 ? 800 : isTop25 ? 700 : 400,
@@ -213,10 +234,10 @@ export function RankingsTable({ teams, selectedSources, loading }: RankingsTable
                   </td>
 
                   {/* Team name */}
-                  <td style={{ padding: '9px 14px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <td style={{ padding: '8px 10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                       <div style={{
-                        width: 3, height: 26, borderRadius: 2,
+                        width: 3, height: 24, borderRadius: 2,
                         background: teamColor, flexShrink: 0,
                       }} />
                       <span style={{
@@ -230,17 +251,17 @@ export function RankingsTable({ teams, selectedSources, loading }: RankingsTable
                   </td>
 
                   {/* Record */}
-                  <td style={{ padding: '9px 14px', textAlign: 'center', fontSize: 12, color: '#64748b', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                  <td style={{ padding: '8px 10px', textAlign: 'center', fontSize: 12, color: '#64748b', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
                     {team.record || '—'}
                   </td>
 
                   {/* Conference */}
-                  <td style={{ padding: '9px 14px', fontSize: 12, color: '#64748b', whiteSpace: 'nowrap' }}>
+                  <td style={{ padding: '8px 10px', fontSize: 12, color: '#64748b', whiteSpace: 'nowrap' }}>
                     {team.conference || '—'}
                   </td>
 
-                  {/* Composite rank */}
-                  <td style={{ padding: '9px 14px', textAlign: 'center' }}>
+                  {/* Composite score (decimal, 0–100) */}
+                  <td style={{ padding: '8px 10px', textAlign: 'center' }}>
                     {team.composite !== undefined ? (
                       <span style={{
                         fontVariantNumeric: 'tabular-nums',
@@ -248,7 +269,7 @@ export function RankingsTable({ teams, selectedSources, loading }: RankingsTable
                         fontSize: isTop5 ? 15 : 13,
                         color: isTop5 ? '#f97316' : isTop25 ? '#1d4ed8' : '#475569',
                       }}>
-                        {team.composite}
+                        {team.composite.toFixed(1)}
                       </span>
                     ) : (
                       <span style={{ color: '#cbd5e1' }}>—</span>
@@ -261,9 +282,9 @@ export function RankingsTable({ teams, selectedSources, loading }: RankingsTable
                     const isActive = selectedSources.has(source.id);
                     return (
                       <td key={source.id} style={{
-                        padding: '9px 14px', textAlign: 'center',
+                        padding: '8px 10px', textAlign: 'center',
                         fontVariantNumeric: 'tabular-nums',
-                        opacity: isActive ? 1 : 0.4,
+                        opacity: isActive ? 1 : 0.35,
                       }}>
                         {rank !== undefined ? (
                           <span style={{
@@ -279,6 +300,37 @@ export function RankingsTable({ teams, selectedSources, loading }: RankingsTable
                       </td>
                     );
                   })}
+
+                  {/* AdjO */}
+                  <td style={{ padding: '8px 10px', textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>
+                    {team.adjO !== undefined ? (
+                      <span style={{
+                        fontSize: 12,
+                        color: team.adjO >= 120 ? '#1e3a5f' : team.adjO >= 115 ? '#1d4ed8' : '#64748b',
+                        fontWeight: team.adjO >= 120 ? 700 : 400,
+                      }}>
+                        {team.adjO.toFixed(1)}
+                      </span>
+                    ) : (
+                      <span style={{ color: '#e2e8f0', fontSize: 12 }}>—</span>
+                    )}
+                  </td>
+
+                  {/* AdjD */}
+                  <td style={{ padding: '8px 10px', textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>
+                    {team.adjD !== undefined ? (
+                      <span style={{
+                        fontSize: 12,
+                        // Lower adjD = better defense
+                        color: team.adjD <= 90 ? '#1e3a5f' : team.adjD <= 96 ? '#1d4ed8' : '#64748b',
+                        fontWeight: team.adjD <= 90 ? 700 : 400,
+                      }}>
+                        {team.adjD.toFixed(1)}
+                      </span>
+                    ) : (
+                      <span style={{ color: '#e2e8f0', fontSize: 12 }}>—</span>
+                    )}
+                  </td>
                 </tr>
               );
             })}
